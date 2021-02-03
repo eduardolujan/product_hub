@@ -1,0 +1,68 @@
+version: '3'
+
+services:
+  product_hub_app: &app
+    image: ${FLASK_APP_HOST}
+    hostname: ${FLASK_APP_HOST}
+    container_name: product_hub_app
+    build:
+      context: .
+      dockerfile: ./compose/local/flask/Dockerfile
+    command: flask run
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+
+  product_hub_celery:
+    <<: *app
+    image: ${CELERY_HOST}
+    hostname: ${CELERY_HOST}
+    container_name: ${CELERY_HOST}
+    depends_on:
+      - product_hub_app
+    env_file:
+      - .env
+    ports: [ ]
+    command: celery -A app:celery worker --loglevel=INFO
+
+  product_hub_postgres:
+    hostname: ${POSTGRES_HOST}
+    container_name: ${POSTGRES_HOST}
+    build:
+      context: .
+      dockerfile: ./compose/local/postgres/Dockerfile
+    image: ${POSTGRES_HOST}
+    volumes:
+      - ${POSTGRES_DATA}:/var/lib/postgresql/data
+      - ${POSTGRES_BACKUPS}:/backups
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT}:5432"
+
+  product_hub_redis:
+    env_file: .env
+    hostname: ${REDIS_HOST}
+    container_name: ${REDIS_HOST}
+    image: library/redis:6.0
+    ports:
+      - "${REDIS_PORT}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - ${REDIS_DATA}:/data
+
+  product_hub_rabbitmq:
+    env_file: .env
+    hostname: ${RABBITMQ_HOST}
+    container_name: ${RABBITMQ_HOST}
+    image: library/rabbitmq:3.8.9-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST}
+    ports:
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+      - "${RABBITMQ_PORT}:5672"
+    volumes:
+      - "${RABBITMQ_DIR}:/var/lib/rabbitmq"
